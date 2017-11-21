@@ -223,6 +223,3 @@ int main(){
         }
         return 0;
 }
-kjdk
-dkeldkel
-
