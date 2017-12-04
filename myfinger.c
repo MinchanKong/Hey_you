@@ -107,20 +107,78 @@ bool cmd_myfinger( int argc, char* argv[] ) {
 		}
 	endutxent();
 	}
+
+	if(flag_b) {
+	while((utx=getutxent()) != NULL ) {
+		if (utx->ut_type != USER_PROCESS) 
+			continue;
+
+		pw=getpwnam(utx->ut_user);
+		tminfo=localtime(&(utx->ut_tv.tv_sec));
+		strftime(buf, sizeof(buf), " %G년 %m월 %d일  %H:%M:%S" ,tminfo);
+
+		printf("Login name: %-20s In real life: %-12s\n",utx->ut_user, pw->pw_comment);
+		printf("Directory: %-21s Shell: %-15s\n",pw->pw_dir,pw->pw_shell);
+		printf("On since %s on %s from %s\n\n", buf, utx->ut_line, utx->ut_host);  
+		}
+	endutxent();
+	}
+
+	if(flag_c) {
+	while((utx=getutxent()) != NULL ) {
+		if (utx->ut_type != USER_PROCESS) 
+			continue;
+
+		pw=getpwnam(utx->ut_user);
+		tminfo=localtime(&(utx->ut_tv.tv_sec));
+		strftime(buf, sizeof(buf), " %G년 %m월 %d일  %H:%M:%S" ,tminfo);
+
+		printf("Login name: %-20s In real life: %-12s\n",utx->ut_user, pw->pw_comment);
+		printf("Directory: %-21s Shell: %-15s\n",pw->pw_dir,pw->pw_shell);
+		printf("On since %s on %s from %s\n\n", buf, utx->ut_line, utx->ut_host);  
+		}
+	endutxent();
+	}
 	return true;
 }
 
 bool cmd_mkdir( int argc, char* argv[] ) {
+	DIR *dir;
+	struct dirent *dent;
+	struct stat file_info;
+	int n;
+
 	if(argc!=2) {
 		printf( "USAGE: mkdir [dir]\n" );
-	}	
+	}
+
 	char wd[BUFSIZ];
 
 	getcwd(wd,BUFSIZ);
 	chdir(wd);
+	if((dir=opendir("./"))==NULL) {
+		perror("opendir");
+		exit(1);
+	}
 
+	while(dent=readdir(dir)) {
+		if(dent->d_name[0]=='.') continue;
+		else {
+			if((stat(dent->d_name,&file_info))==-1) {
+				perror("Error : ");
+				exit(1);
+			}
+			
+			if(S_ISDIR(file_info.st_mode)) {
+				n=strcmp(dent->d_name,argv[1]);
+				if(n==0) {
+					printf("mkdir: '%s' 디렉토리를 만들 수 없습니다: 파일이 존재함\n",argv[1]);
+					return true;
+				}
+			}
+		}
+	}
 	mkdir(argv[1],0755);
-
 	return true;
 }
 
@@ -131,7 +189,7 @@ bool cmd_rmdir( int argc, char* argv[] ) {
 	chdir(wd);
 
 	if(rmdir(argv[1])==-1) {
-		printf("%s not exist\n");
+		printf("rmdir: failed to remove '%s': 해당 파일이나 디렉토리가 없음\n",argv[1]); 
 	}
 	return true;
 }
