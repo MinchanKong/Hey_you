@@ -12,28 +12,29 @@
 #include <stdbool.h>
 #include <fcntl.h>
 #include <sys/wait.h>
-#include <siganl.h>
+#include <signal.h>
+#include <grp.h>
 
-struct COMMAND { // ì»¤ë§¨ë“œ êµ¬ì¡°ì²´
+struct COMMAND { 
         char* name;
         char* desc;
-        bool ( *func )( int argc, char* argv[] ); // í•¨ìˆ˜í¬ì¸í„°. ì‚¬ìš©í•  í•¨ìˆ˜ë“¤ì˜ ë§¤ê°œë³€ìˆ˜ë¥¼ ë§ì¶°ì¤Œ
+        bool ( *func )( int argc, char* argv[] ); 
 };
 
-pid_t chile=-1;
+pid_t child=-1;
 int status;
 int list_CHLD[100];
 int count=0;
 
-bool cmd_cd( int argc, char* argv[] );          //cd ëª…ë ¹ì–´
-bool cmd_exit( int argc, char* argv[] );        //exit, quit ëª…ë ¹ì–´
-bool cmd_help( int argc, char* argv[] );       //help ëª…ë ¹ì–´
-bool cmd_myfinger(int argc, char* argv[]);     //myfinger ëª…ë ¹ì–´ 
-bool cmd_mkdir( int argc, char* argv[] );	// mkdir ëª…ë ¹ì–´
-bool cmd_rmdir( int argc, char* argv[] );	// rmdir ëª…ë ¹ì–´
-bool cmd_ls(int argc, char* argv[]);	// ls ëª…ë ¹ì–´
-bool cmd_cat( int argc, char* argv[] );	// cat ëª…ë ¹ì–´
-bool cmd_pwd(int argc, char* argv[]);	// pwd ëª…ë ¹ì–´
+bool cmd_cd( int argc, char* argv[] );          
+bool cmd_exit( int argc, char* argv[] );        
+bool cmd_help( int argc, char* argv[] );      
+bool cmd_myfinger(int argc, char* argv[]);   
+bool cmd_mkdir( int argc, char* argv[] );	
+bool cmd_rmdir( int argc, char* argv[] );
+bool cmd_ls(int argc, char* argv[]);	
+bool cmd_cat( int argc, char* argv[] );
+bool cmd_pwd(int argc, char* argv[]);
 
 struct COMMAND  builtin_cmds[] =
 {
@@ -45,7 +46,7 @@ struct COMMAND  builtin_cmds[] =
     { "myfinger", "show user information", cmd_myfinger },
     { "mkdir", "make directory", cmd_mkdir },
     { "rmdir", "delete directory", cmd_rmdir },
-    { "ls", "show all files in this directory" ,cmd_ls }
+    { "ls", "show all files in this directory" ,cmd_ls },
     { "cat", "show contents of the file", cmd_cat },
     { "pwd", "show the location of the current directory" ,cmd_pwd }
 };
@@ -64,8 +65,8 @@ void handler(int sig)
 			case SIGINT:
 				printf("Ctrl + c SIGINT\n");
 				break;
-			case SIGSTP:
-				printf("Ctrl + z SIGSTP\n");
+			case SIGTSTP:
+				printf("Ctrl + z SIGTSTP\n");
 				kill(0, SIGCHLD);
 				break;
 			case SIGCONT:
@@ -122,7 +123,7 @@ bool cmd_cat(int argc, char *argv[])
 	return true;
 }
 
-bool cmd_help( int argc, char* argv[] ) // ëª…ë ¹ì–´ ì¶œë ¥
+bool cmd_help( int argc, char* argv[] ) 
 { 
         int i;
         for( i = 0; i < sizeof( builtin_cmds ) / sizeof( struct COMMAND ); i++ )
@@ -184,7 +185,7 @@ bool cmd_myfinger( int argc, char* argv[] ) {
 
 		pw=getpwnam(utx->ut_user);
 		tminfo=localtime(&(utx->ut_tv.tv_sec));
-		strftime(buf, sizeof(buf), " %Gë…„ %mì›” %dì¼  %H:%M:%S" ,tminfo);
+		strftime(buf, sizeof(buf), "%G³â %m¿ù %dÀÏ %H:%M:%S" ,tminfo);
 
 		printf("Login name: %-20s In real life: %-12s\n",utx->ut_user, pw->pw_comment);
 		printf("Directory: %-21s Shell: %-15s\n",pw->pw_dir,pw->pw_shell);
@@ -217,7 +218,7 @@ bool cmd_myfinger( int argc, char* argv[] ) {
 				if(S_ISDIR(file_info.st_mode)) {
 					n=strcmp(dent->d_name,"finger_result");
 					if(n==0) {
-						printf("finger_result ë””ë ‰í† ë¦¬ê°€ ì¡´ì¬í•©ë‹ˆë‹¤.\n");
+						printf("finger_result µğ·ºÅä¸®°¡ Á¸ÀçÇÕ´Ï´Ù.\n");
 						break;	
 					}
 				}
@@ -227,9 +228,7 @@ bool cmd_myfinger( int argc, char* argv[] ) {
 		chdir("finger_result");
 
 		while((utx=getutxent()) != NULL ) {
-			if (utx->ut_type != USER_PROCESS) {
-				continue;
-			}
+			if (utx->ut_type != USER_PROCESS) continue;
 
 			pw=getpwnam(utx->ut_user);
 			tminfo=localtime(&(utx->ut_tv.tv_sec));
@@ -249,55 +248,55 @@ bool cmd_myfinger( int argc, char* argv[] ) {
 				if(S_ISDIR(file_info.st_mode)) {
 					n=strcmp(dent->d_name,buf);
 					if(n==0) {
-						printf("%s ë””ë ‰í† ë¦¬ê°€ ì¡´ì¬í•©ë‹ˆë‹¤.\n",buf);
+						printf("%s µğ·ºÅä¸®°¡ Á¸ÀçÇÕ´Ï´Ù.\n",buf);
 						break;	
 					}
 				}
 			}
+			if(n!=0) mkdir(buf,0755);
 			
-		if(n!=0){
-			mkdir(buf,0755);
-		}
-		chdir(buf);
-		memset(buf,NULL,100);	
-		strftime(buf, sizeof(buf), " %Gë…„ %mì›” %dì¼  %H:%M:%S" ,tminfo);
+			chdir(buf);
+			memset(buf,NULL,100);	
+			strftime(buf, sizeof(buf), "%G³â %m¿ù %dÀÏ %H:%M:%S" ,tminfo);
 		
-		if((dir=opendir("./"))==NULL) {
-			perror("opendir");
-			exit(1);
-		}
-
-		while(dent=readdir(dir)) {
-			if((stat(dent->d_name,&file_info))==-1) {
-				perror("Error : ");
+			if((dir=opendir("./"))==NULL) {
+				perror("opendir");
 				exit(1);
 			}
-		
-		n=strcmp(dent->d_name,utx->user);
-		if(n==0) {
-			if((wfp=fopen("a", "w")) == NULL) {
-				perror("fopen: ");
-				exit(1);
-			}	
-		}
-			
-		if(n!=0) {
-			if((wfp=fopen(utx->ut_user, "w")) == NULL) {
-				perror("fopen: ");
-			exit(1);
-		}
 
-		fprintf(wfp,"Login name : %s\n",utx->ut_user);
-		fprintf(wfp,"In real life : %s\n",pw->pw_comment);
-		fprintf(wfp,"Directory : %s\n",pw->pw_dir);
-		fprintf(wfp,"Shell : %s\n",pw->pw_shell);
-		fprintf(wfp,"Time : %s\n",buf);
-		fprintf(wfp,"TTY : %s\n",utx->ut_line);
-		fprintf(wfp,"IP : %s\n",utx->ut_host);
-		fprintf(wfp,"-------------------------------------\n");
+			while(dent=readdir(dir)) {
+				if((stat(dent->d_name,&file_info))==-1) {
+					perror("Error : ");
+					exit(1);
+				}
+		
+				n=strcmp(dent->d_name,utx->ut_user);
+				if(n==0) {
+					if((wfp=fopen(utx->ut_user, "a")) == NULL) {
+						perror("fopen: ");
+						break;	
+					}	
+				}
+			}
+			
+			if(n!=0) {
+				if((wfp=fopen(utx->ut_user, "w")) == NULL) {
+					perror("fopen: ");
+					exit(1);	
+				}
+			}
+
+			fprintf(wfp,"Login name : %s\n",utx->ut_user);
+			fprintf(wfp,"In real life : %s\n",pw->pw_comment);
+			fprintf(wfp,"Directory : %s\n",pw->pw_dir);
+			fprintf(wfp,"Shell : %s\n",pw->pw_shell);
+			fprintf(wfp,"Time : %s\n",buf);
+			fprintf(wfp,"TTY : %s\n",utx->ut_line);
+			fprintf(wfp,"IP : %s\n",utx->ut_host);
+			fprintf(wfp,"-------------------------------------\n");
 		 
-		chdir("..");
-	}
+			chdir("..");
+		}
 		endutxent();
 		fclose(wfp);
 	}
@@ -334,7 +333,7 @@ bool cmd_mkdir( int argc, char* argv[] ) {
 			if(S_ISDIR(file_info.st_mode)) {
 				n=strcmp(dent->d_name,argv[1]);
 				if(n==0) {
-					printf("mkdir: '%s' ë””ë ‰í† ë¦¬ë¥¼ ë§Œë“¤ ìˆ˜ ì—†ìŠµë‹ˆë‹¤: íŒŒì¼ì´ ì¡´ì¬í•¨\n",argv[1]);
+					printf("mkdir: '%s' µğ·ºÅä¸®¸¦ ¸¸µé ¼ö ¾ø½À´Ï´Ù: ÆÄÀÏÀÌ Á¸ÀçÇÔ\n",argv[1]);
 					return true;
 				}
 			}
@@ -351,7 +350,7 @@ bool cmd_rmdir( int argc, char* argv[] ) {
 	chdir(wd);
 
 	if(rmdir(argv[1])==-1) {
-		printf("rmdir: failed to remove '%s': í•´ë‹¹ íŒŒì¼ì´ë‚˜ ë””ë ‰í† ë¦¬ê°€ ì—†ìŒ\n",argv[1]); 
+		printf("rmdir: failed to remove '%s': ÇØ´ç ÆÄÀÏÀÌ³ª µğ·ºÅä¸®°¡ ¾øÀ½\n",argv[1]);
 	}
 	return true;
 }
@@ -413,6 +412,7 @@ void rwx(file_mode) {
 		
 bool cmd_ls( int argc, char* argv[] ) {
 	int flag_l=0;
+	int n;
 	
 	if(argc==2) {
 		n=*(argv[1]+1);
@@ -473,7 +473,7 @@ bool cmd_ls( int argc, char* argv[] ) {
 			}
 			
 			else {
-				file_mode=file.info.st_mode;
+				file_mode=file_info.st_mode;
 				rwx(file_mode);
 				printf(" %d ", file_info.st_nlink);
 				
@@ -485,7 +485,7 @@ bool cmd_ls( int argc, char* argv[] ) {
 				printf(" %d ",file_info.st_size);
 				
 				tminfo=localtime(&(file_info.st_mtime));
-				strftime(buf,sizeof(buf)," %mì›” %dì¼ %H:%M ",tminfo);
+				strftime(buf,sizeof(buf)," %m¿ù %dÀÏ %H:%M ",tminfo);
 				printf(" %s ",buf);
 				
 				if(dentry->d_ino !=0) {
@@ -495,6 +495,7 @@ bool cmd_ls( int argc, char* argv[] ) {
 			closedir(dirp);
 		}
 	} 
+	return true;
 }
 
 int tokenize( char* buf, char* delims, char* tokens[], int maxTokens ){
@@ -531,8 +532,8 @@ bool run( char* line ){
                         return builtin_cmds[i].func( token_count, tokens );
         }
 	
-	chile=fork();
-	if(chile==0){
+	child=fork();
+	if(child=0){
 		if(signal(SIGINT,handler)==SIG_ERR){
 			printf("SIGINT Error\n");
 			_exit(1);
@@ -554,20 +555,20 @@ bool run( char* line ){
 }
 
 int main(){
-        char line[1024];
+	char line[1024];
 	char wd[BUFSIZ];
 	char c;
 	int n=0;
 	
-	siganl(SIGINT, handler);
+	signal(SIGINT, handler);
 	signal(SIGTSTP, handler);
 
-        while( 1 )
-        {
+    while( 1 )
+    {
 		n=0;
 		memset(line, '\0', sizeof(line));
 		getcwd(wd,BUFSIZ);
-            	printf( "[%s] $ ", wd);
+       	printf( "[%s] $ ", wd);
 		
 		while(c=fgetc(stdin))
 		{
@@ -576,9 +577,7 @@ int main(){
 			switch(c)
 			{
 				case 8:
-					if(n==0) {
-						break;
-					}
+					if(n==0) break;
 					
 					fputc('\b', stdout);
 					fputc(' ', stdout);
@@ -593,9 +592,8 @@ int main(){
 		}
 		line[n]='\0';
 		
-            	if( run( line ) == false ) {
-			break;
-		}
+	   	if( run( line ) == false ) break;
+
 		fflush(stdin);
 		memset(wd,NULL,BUFSIZ);	
 	}
